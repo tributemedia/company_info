@@ -10,7 +10,16 @@ function company_info_form_system_site_information_settings_alter(&$form, &$form
   $poweredby_options = array(
     0 => t('Tribute Media'),
     1 => t('Dealer Marketing'),
-    2 => t('No Attribution Line'),
+  );
+  $form['schema_markup'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Schema Markup Settings'),
+    '#weight' => 1,
+  );
+  $form['schema_markup']['schema_markup_display'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Remove Schema Markup'),
+    '#default_value' => variable_get('schema_markup_display', FALSE),
   );
   $form['company_info'] = array(
     '#type' => 'fieldset',
@@ -51,24 +60,14 @@ function company_info_form_system_site_information_settings_alter(&$form, &$form
   $form['company_info']['co_phone'] = array(
     '#type' => 'textfield',
     '#title' => t('Phone Number'),
-    //'#maxlength' => 12,
     '#default_value' => variable_get('co_phone', '888-828-8282'),
     '#required' => TRUE,
   );
   $form['company_info']['co_phone2'] = array(
-        '#type' => 'textfield',
-        '#title' => t('Alternate Phone Number'),
-        //'#maxlength' => 12,
-        '#default_value' => variable_get('co_phone2', ''),
-        //'#required' => TRUE,
-  );
-  $form['company_info']['co_fax'] = array(
-            '#type' => 'textfield',
-            '#title' => t('Fax Number'),
-            //'#maxlength' => 12,
-            '#default_value' => variable_get('co_fax', ''),
-            //'#required' => TRUE,
-  ); //fax info added by Matthew Contos 11JAN2017
+          '#type' => 'textfield',
+          '#title' => t('Alternate Phone Number'),
+          '#default_value' => variable_get('co_phone2', ''),
+  ); 
   $form['attribute_line_info'] = array(
     '#type' => 'fieldset',
     '#title' => t('Attribute Line Information'),
@@ -79,5 +78,88 @@ function company_info_form_system_site_information_settings_alter(&$form, &$form
     '#title' => t('Powered by'),
     '#options' => $poweredby_options,
     '#default_value' => variable_get('powered_by', $poweredby_options[0]),
-  );  
+  );
+  $form['#submit'] = array();
+  $form['#submit'][] = 'company_info_submit_handler';
+}
+
+// ===================================================
+// = Custom Submit Handler for Site Information Form =
+// ===================================================
+
+function company_info_submit_handler($form, &$form_state) {
+  $values = $form_state['values'];
+  $site_name = $values['site_name'];
+  $street_add = $values['co_address'];
+  $city = $values['co_city'];
+  $state = $values['co_state'];
+  $zip = $values['co_zip'];
+  $phone = $values['co_phone'];
+  $no_schema = $values['schema_markup_display'];
+  
+  if ($no_schema) {
+    $html = '<div id="copyright-line" class="left-align center-on-mobile">';
+    $html .= '<div class="connect">';
+    $html .= '<div class="copyright">&copy;' . date("Y") . '&nbsp;</div>';
+    $html .= '<div class="name">' . $site_name . '</div>';
+    $html .= '<div class="street_add">' . $street_add . '</div>';
+    $html .= '<div class="connect">';
+    $html .= '<div class="city">' . $city . ',&nbsp;</div>';
+    $html .= '<div class="state">' . $state . '&nbsp;</div>';
+    $html .= '<div class="zip">' . $zip . '</div>';
+    $html .= '</div> <!-- .connect -->';
+    $html .= '<div class="phone">' . $phone . '</div>';
+    $html .= '</div> <!-- #copyright-line -->';
+  } else {
+    $html = '<div itemscope itemtype="http://shcema.org/LocalBusiness" id="copyright-line" class="left-align center-on-mobile">';
+    $html .= '<div class="connect">';
+    $html .= '<div class="copyright">&copy;' . date("Y") . '&nbsp;</div>';
+    $html .= '<div itemprop="name" class="name">' . $site_name . '</div>';
+    $html .= '<div itemprop="address" itemscope itemtype="http://schema.org/PostalAddress">';
+    $html .= '<div itemprop="streetAddress" class="street_add">' . $street_add . '</div>';
+    $html .= '<div class="connect">';
+    $html .= '<div itemprop="addressLocality" class="city">' . $city . ',&nbsp;</div>';
+    $html .= '<div itemprop="addressRegion" class="state">' . $state . '&nbsp;</div>';
+    $html .= '<div itemprop="postalCode" class="zip">' . $zip . '</div>';
+    $html .= '</div><!-- end scope address -->';
+    $html .= '</div> <!-- .connect -->';
+    $html .= '<div itemprop="telephone" class="phone">' . $phone . '</div>';
+    $html .= '</div> <!-- #copyright-line -->';
+  }
+  
+  variable_set('company_info_block_content', $html);
+}
+
+// ================================
+// = Implements hook_block_info() =
+// ================================
+
+function company_info_block_info() {
+  $blocks = array();
+  $blocks['company_info_block'] = array(
+    'info' => t('Company Information Block'),
+    'region' => 'footer',
+    'status' => 1,
+    'weight' => 50,
+    'visibility' => 1,
+  );
+  
+  return $blocks;
+}
+
+// ================================
+// = Implements hook_block_view() =
+// ================================
+
+function company_info_block_view($delta = '') {
+  $block = array();
+  
+  switch ($delta) {
+    case 'company_info_block':
+    $block['subject'] = '';
+    $block['content'] = variable_get('company_info_block_content', '');
+    break;
+    
+  }
+  return $block;
 }
